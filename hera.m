@@ -1,7 +1,7 @@
 %----------------------------------------------------------------
-%HERA: Heart Rate Analysis v0.06 beta Feb 2018
+%HERA: Heart Rate Analysis v0.07 beta April 2020
 %
-%(c) 2008-2018 Erno Hermans & Thijs vd Laar
+%(c) 2008-2020 Erno Hermans & Thijs vd Laar
 %----------------------------------------------------------------
 
 %v0.02: fixed check for wavelet manager
@@ -14,6 +14,12 @@
 %       at the center of the figure, and does so much faster.
 %v0.06: Added transparency to the red rectangles that indicate
 %       the rejection period.
+%v0.07: Added root median square of successive differences (rMedSSD) as a
+%       potentially more robust measure of HRV. Updated "collect for output
+%       to work also with incomplete data.
+%v0.08: Replaced root median square of successive differences by root 
+%       truncated mean of successive differences (rtMSSD), because the low sampling
+%       frequency caused the median to jump.
 
 function varargout = hera(varargin)
 % HERA M-file for hera.fig
@@ -39,7 +45,7 @@ function varargout = hera(varargin)
 
 % Edit the above text to modify the response to help hera
 
-% Last Modified by GUIDE v2.5 10-Mar-2013 22:53:12
+% Last Modified by GUIDE v2.5 02-Jun-2020 19:27:34
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -329,6 +335,7 @@ set(handles.hera_lowerboundHF, 'String',handles.currentfile.matfile.settings.low
 set(handles.hera_upperboundHF, 'String',handles.currentfile.matfile.settings.upperboundHF);
 set(handles.hera_preBPM, 'String',handles.currentfile.matfile.outmeasures.preBPM);
 set(handles.hera_prerMSSD, 'String',handles.currentfile.matfile.outmeasures.rMSSD);
+set(handles.hera_prertMSSD, 'String',handles.currentfile.matfile.outmeasures.rtMSSD);
 set(handles.hera_postBPM, 'String',handles.currentfile.matfile.outmeasures.postBPM);
 set(handles.hera_LFHFrat, 'String',handles.currentfile.matfile.outmeasures.LFHFratio);
 set(handles.hera_LFpower, 'String',handles.currentfile.matfile.outmeasures.LFPower);
@@ -660,6 +667,7 @@ handles.currentfile.matfile.lowerboundHFIndex = [];
 handles.currentfile.matfile.upperboundHFIndex = [];
 handles.currentfile.matfile.outmeasures.preBPM = [];
 handles.currentfile.matfile.outmeasures.rMSSD = [];
+handles.currentfile.matfile.outmeasures.rtMSSD = [];
 handles.currentfile.matfile.outmeasures.LFPower = [];
 handles.currentfile.matfile.outmeasures.HFPower = [];
 handles.currentfile.matfile.outmeasures.LFHFratio = [];
@@ -1638,6 +1646,7 @@ if handles.currentfile.open &  ~isempty(handles.currentfile.matfile.preibichanne
         handles = CalcPreOutMeasures(handles);
         set(handles.hera_preBPM, 'String',handles.currentfile.matfile.outmeasures.preBPM);
         set(handles.hera_prerMSSD, 'String',handles.currentfile.matfile.outmeasures.rMSSD);
+        set(handles.hera_prertMSSD, 'String',handles.currentfile.matfile.outmeasures.rtMSSD);
 
         %handles = drawgui(handles);
         guidata(hObject, handles);
@@ -1708,6 +1717,7 @@ if handles.currentfile.open &  ~isempty(handles.currentfile.matfile.preibichanne
         handles = CalcPreOutMeasures(handles);
         set(handles.hera_preBPM, 'String',handles.currentfile.matfile.outmeasures.preBPM);
         set(handles.hera_prerMSSD, 'String',handles.currentfile.matfile.outmeasures.rMSSD);
+        set(handles.hera_prertMSSD, 'String',handles.currentfile.matfile.outmeasures.rtMSSD);
         
         %Finish
         guidata(hObject, handles);
@@ -1770,6 +1780,13 @@ end
 %Now Calculate rMSSD from SDs
 handles.currentfile.matfile.outmeasures.rMSSD = sqrt(mean(SDs.^2));
 
+%20200602: Now also calculate rtMSSD from SDs, using truncated means
+%This uses trimmean with 20% of data removed, ie it removes the upper and
+%lower 10% of the distribution.
+SSDs=SDs.^2;
+tMSSDs=trimmean(SSDs,20);
+rtMSSD=sqrt(tMSSDs);
+handles.currentfile.matfile.outmeasures.rtMSSD = rtMSSD;
 
 
 %----------------------------------------------------------------
@@ -1864,6 +1881,7 @@ if handles.currentfile.open &  ~isempty(handles.currentfile.matfile.preibichanne
     handles = CalcPreOutMeasures(handles);
     set(handles.hera_preBPM, 'String',handles.currentfile.matfile.outmeasures.preBPM);
     set(handles.hera_prerMSSD, 'String',handles.currentfile.matfile.outmeasures.rMSSD);
+    set(handles.hera_prertMSSD, 'String',handles.currentfile.matfile.outmeasures.rtMSSD);
 
     %handles = drawgui(handles);
     guidata(hObject, handles);
@@ -1933,6 +1951,7 @@ if handles.currentfile.open &  ~isempty(handles.currentfile.matfile.preibichanne
     handles = CalcPreOutMeasures(handles);
     set(handles.hera_preBPM, 'String',handles.currentfile.matfile.outmeasures.preBPM);
     set(handles.hera_prerMSSD, 'String',handles.currentfile.matfile.outmeasures.rMSSD);
+    set(handles.hera_prertMSSD, 'String',handles.currentfile.matfile.outmeasures.rtMSSD);
     
     %handles = drawgui(handles);
     guidata(hObject, handles);
@@ -2015,7 +2034,7 @@ else
 end
 
 %Create top line with variable names
-outascii = [double('filepath'),9,double('filename'),9,double('IBI_BPM'),9,double('rMSSD'),9,double('wavBPM'),9,double('LFpower'),9,double('HFpower'),9,double('LFHFratio'),13,10];
+outascii = [double('filepath'),9,double('filename'),9,double('IBI_BPM'),9,double('rMSSD'),9,double('rtMSSD'),9,double('wavBPM'),9,double('LFpower'),9,double('HFpower'),9,double('LFHFratio'),13,10];
 %Load all files and collect the output data
 for i=1:size(ffiles,1)
 
@@ -2027,28 +2046,45 @@ for i=1:size(ffiles,1)
         return
     else
         cmatfilecontent = load(cmatfile);
-        if numel(cmatfilecontent.matfile.outmeasures.preBPM == 1) & ...
-            numel(cmatfilecontent.matfile.outmeasures.rMSSD == 1) & ...
-            numel(cmatfilecontent.matfile.outmeasures.postBPM == 1) & ...
-            numel(cmatfilecontent.matfile.outmeasures.LFPower == 1) & ...
-            numel(cmatfilecontent.matfile.outmeasures.HFPower == 1) & ...
-            numel(cmatfilecontent.matfile.outmeasures.LFHFratio == 1);
-            [cpath,cfile,cext]=fileparts(cmatfile);
-            outascii = [outascii, double(cpath), 9,double(cfile),9];
-            outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.preBPM)), 9];
-            outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.rMSSD)), 9];
-            outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.postBPM)), 9];
-            outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.LFPower)), 9];
-            outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.HFPower)), 9];
-            outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.LFHFratio)), 13, 10];
-      
-            clear cmatfilecontent
         
-        else
-            
-            msgbox(['The file: ',cfile,' has not been fully processed. Finish processing this file first before collecting output.']);
-            return
+        %Update 20200415: make sure collect for output works with missing
+        %fields, including rtMSSD
+        %For each field, check if it exists and if not make an empty one
+        if ~isfield(cmatfilecontent.matfile.outmeasures,'preBPM')
+            cmatfilecontent.matfile.outmeasures.preBPM=[];
         end
+        if ~isfield(cmatfilecontent.matfile.outmeasures,'rMSSD')
+            cmatfilecontent.matfile.outmeasures.rMSSD=[];
+        end
+        if ~isfield(cmatfilecontent.matfile.outmeasures,'rtMSSD')
+            cmatfilecontent.matfile.outmeasures.rtMSSD=[];
+        end
+        if ~isfield(cmatfilecontent.matfile.outmeasures,'postBPM')
+            cmatfilecontent.matfile.outmeasures.postBPM=[];
+        end
+        if ~isfield(cmatfilecontent.matfile.outmeasures,'LFPower')
+            cmatfilecontent.matfile.outmeasures.LFPower=[];
+        end
+        if ~isfield(cmatfilecontent.matfile.outmeasures,'HFPower')
+            cmatfilecontent.matfile.outmeasures.HFPower=[];
+        end
+        if ~isfield(cmatfilecontent.matfile.outmeasures,'LFHFratio')
+            cmatfilecontent.matfile.outmeasures.LFHFratio=[];
+        end
+        
+        [cpath,cfile,cext]=fileparts(cmatfile);
+        
+        %Copy the data into the file, and leave empty values empty    
+        outascii = [outascii, double(cpath), 9,double(cfile),9];
+        outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.preBPM)), 9];
+        outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.rMSSD)), 9];
+        outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.rtMSSD)), 9];
+        outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.postBPM)), 9];
+        outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.LFPower)), 9];
+        outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.HFPower)), 9];
+        outascii = [outascii, double(num2str(cmatfilecontent.matfile.outmeasures.LFHFratio)), 13, 10];
+      
+        clear cmatfilecontent
     end
 end
 
@@ -2213,3 +2249,26 @@ end
 function outdata = nanmean_selfmade(indata)
 
 outdata = mean(indata(~isnan(indata)));
+
+
+
+function hera_prertMSSD_Callback(hObject, eventdata, handles)
+% hObject    handle to hera_prertMSSD (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of hera_prertMSSD as text
+%        str2double(get(hObject,'String')) returns contents of hera_prertMSSD as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function hera_prertMSSD_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to hera_prertMSSD (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
